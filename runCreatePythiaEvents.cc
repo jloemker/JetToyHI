@@ -36,8 +36,8 @@ int main (int argc, char ** argv)
 
   std::cout << "generating " << nEvent << " events with pthat = " << ptHat << " and tune = " << tune << std::endl;  
 
-  pythiaEvent pyt(ptHat, tune, -3.0, 3.0);
-
+  pythiaEvent pyt(ptHat, tune, -3.0, 3.0);//maybe smaller eta here ?
+  
   ProgressBar Bar(cout, nEvent);
   Bar.SetStyle(-1);
 
@@ -78,7 +78,7 @@ int main (int argc, char ** argv)
     fout << "end\n";
     
     //std::cout << "weight: " << std::scientific << pyt.getWeight() << std::endl;
-    //std::cout << "pthat: " << std::fixed <<  pyt.getPtHat() << std::endl;
+   // std::cout << "pthat: " << std::fixed <<  pyt.getPtHat() << std::endl;
   }
 
   pyt.getStat();

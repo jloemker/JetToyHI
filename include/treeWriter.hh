@@ -31,6 +31,7 @@ private :
   std::map<std::string,std::vector<bool>  > boolMaps_;
   std::map<std::string,std::vector<int>  > intMaps_;
   std::map<std::string,std::vector<double>  > doubleMaps_;
+  std::map<std::string,std::vector<std::vector<std::vector<double> > > > doubleMap3D_;
   std::map<std::string,std::vector<std::vector<double>>> doubleVectorMaps_;
   std::map<std::string,std::vector<std::vector<int>>> intVectorMaps_;
 
@@ -42,6 +43,7 @@ public :
   void addCollection(std::string name, const jetCollection &c, bool writeConst = false);
   void addCollection(std::string name, const std::vector<fastjet::PseudoJet> &v, bool writeConst = false);
   void addCollection(std::string name, const std::vector<double> &v);
+  void addCollection(std::string name, const std::vector<std::vector<std::vector<double>>> &v);
   void addCollection(std::string name, const std::vector<int> &v);
   void addCollection(std::string name, const std::vector<bool> &v);
   void addJetCollection(std::string name, const jetCollection &c, bool writeConst = false);
@@ -50,9 +52,11 @@ public :
   void addPartonCollection(std::string name, const std::vector<fastjet::PseudoJet> v);
   
   void addDoubleCollection(std::string name, const std::vector<double> v);
+  void addDoubleCollection3D(std::string name, const std::vector<std::vector<std::vector<double> > > v);
   void addIntCollection(std::string name, const std::vector<int> v);
   void addBoolCollection(std::string name, const std::vector<bool> v);
   void bookBranchDoubleVec(std::string name);
+  void bookBranchDoubleVec3D(std::string name);
   void bookBranchIntVec(std::string name);
   void bookBranchBoolVec(std::string name);
 
@@ -99,7 +103,10 @@ void treeWriter::addCollection(std::string name, const std::vector<double> &v)
 {
   addDoubleCollection(name, v);
 }
-
+void treeWriter::addCollection(std::string name, const std::vector<std::vector<std::vector<double> > > &v)
+{
+  addDoubleCollection3D(name, v);
+}
 void treeWriter::addCollection(std::string name, const std::vector<int> &v)
 {
   addIntCollection(name, v);
@@ -246,6 +253,12 @@ void treeWriter::addDoubleCollection(std::string name, const std::vector<double>
   bookBranchDoubleVec(name);
 }
 
+void treeWriter::addDoubleCollection3D(std::string name, const std::vector<std::vector<std::vector<double> > > v)
+{
+  doubleMap3D_[name] = v;
+  bookBranchDoubleVec3D(name);
+}
+
 void treeWriter::addIntCollection(std::string name, const std::vector<int> v)
 {
   intMaps_[name] = v;
@@ -262,6 +275,11 @@ void treeWriter::bookBranchDoubleVec(std::string name)
 {
   if(!treeOut_->GetBranch(name.c_str()))
     treeOut_->Branch(name.c_str(),&doubleMaps_[name]);
+}
+void treeWriter::bookBranchDoubleVec3D(std::string name)
+{
+  if(!treeOut_->GetBranch(name.c_str()))
+    treeOut_->Branch(name.c_str(),&doubleMap3D_[name]);
 }
 
 void treeWriter::bookBranchIntVec(std::string name)

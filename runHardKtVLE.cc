@@ -115,6 +115,7 @@ int main (int argc, char ** argv) {
     //---------------------------------------------------------------------------
     //std::cout << "do dynamical grooming signal jets" << std::endl;
     dyGroomer dygKTDSig(1);
+
     jetCollection jetCollectionSigDYKTD(dygKTDSig.doGrooming(jetCollectionSig));
     jetCollectionSigDYKTD.addVector("kappaSigDYKTD",    dygKTDSig.getKappas());
     jetCollectionSigDYKTD.addVector("rgSigDYKTD",       dygKTDSig.getDR12());   

@@ -21,7 +21,10 @@
 #include "include/jetMatcher.hh"
 #include "include/csSubtractor.hh"
 #include "include/csSubtractorFullEvent.hh"
+#include "include/csSubFullEventIterative.hh"
 #include "include/Angularity.hh"
+#include "include/AliceFastSim.hh"
+#include "include/thermalAlice.hh"
 
 using namespace std;
 using namespace fastjet;
@@ -30,10 +33,20 @@ using namespace fastjet;
 
 // ./runTimeClusBkg -hard samples/PythiaEventsTune14PtHat120_10k.pu14 -pileup samples/ThermalEventsMult7000PtAv1.20_0.pu14 -nev 10
 
+bool checkNanValues(int id, vector<PseudoJet> partonsFirstSplit){
+  if(partonsFirstSplit[id].m()<0.0000005 || partonsFirstSplit[id+1].m()<0.0000005 || partonsFirstSplit[id].pt()>500000000 || partonsFirstSplit[id+1].pt()>500000000 || partonsFirstSplit[id].pt()<0.05 || partonsFirstSplit[id+1].pt()<0.05 || !partonsFirstSplit[id].pt() || !partonsFirstSplit[id+1].pt() || !partonsFirstSplit[id].m() || !partonsFirstSplit[id+1].m() || partonsFirstSplit[id].rap() < 0.00001 || partonsFirstSplit[id+1].rap()<0.00001 || partonsFirstSplit[id].m() =='inf' || partonsFirstSplit[id+1].m() =='inf' || partonsFirstSplit[id].m() =='-nan' || partonsFirstSplit[id+1].m() =='-nan'){
+   return false;
+   }else{
+   return true;
+   }
+}
+
 int main (int argc, char ** argv) {
 
   auto start_time = std::chrono::steady_clock::now();
-  
+  AliceFastSim fastSim = AliceFastSim();//Bas
+  thermalAlice thrmEvent;//Bas
+
   CmdLine cmdline(argc,argv);
   // inputs read from command line
   int nEvent = cmdline.value<int>("-nev",1);  // first argument: command line option; second argument: default value
@@ -45,6 +58,8 @@ int main (int argc, char ** argv) {
   ClusterSequence::set_fastjet_banner_stream(NULL);
 
   //to write info to root tree
+  TFile *fout = new TFile("JetToyHIResultTimeClusBkg.root","RECREATE");
+  
   treeWriter trwSig("jetTreeSig");
  
   //Jet definition
@@ -72,13 +87,18 @@ int main (int argc, char ** argv) {
   int iev = 0;
   unsigned int entryDiv = (nEvent > 200) ? nEvent / 200 : 1;
   while ( mixer.next_event() && iev < nEvent )
-  {
+  {  
+    if(mixer.particles().size()==0){
+      std::cout<<"no event info"<<std::endl;
+      continue;
+    }
     // increment event number    
     iev++;
    // std::cout << "begin " << std::endl;
-
     Bar.Update(iev);
     Bar.PrintWithMod(entryDiv);
+    std::vector<fastjet::PseudoJet> particlesPileup = thrmEvent.createThermalEventAlice();//Bas
+    thrmEvent.createThermalEventAlice();//Bas
 
     std::vector<fastjet::PseudoJet> particlesMergedAll = mixer.particles();
 
@@ -102,9 +122,10 @@ int main (int argc, char ** argv) {
     fastjet::Selector bkg_selector = SelectorVertexNumber(1);
     vector<PseudoJet> particlesBkg = bkg_selector(particlesMergedAll);
 
-    vector<PseudoJet> particlesMerged = particlesBkg;
-    particlesMerged.insert( particlesMerged.end(), particlesSig.begin(), particlesSig.end() );
-
+    //vector<PseudoJet> particlesMerged = particlesBkg;//Marta
+    vector<PseudoJet> particlesMerged = particlesSig;//Bas
+    //particlesMerged.insert( particlesMerged.end(), particlesSig.begin(), particlesSig.end() );//Marta
+    particlesMerged.insert( particlesMerged.end(), particlesPileup.begin(), particlesPileup.end() );
     //charged particles
     fastjet::Selector charged_selector = SelectorIsCharged();
     vector<PseudoJet> particlesSigCh = charged_selector(particlesSig);
@@ -116,25 +137,37 @@ int main (int argc, char ** argv) {
     //   look at first splitting of hard partons
     //---------------------------------------------------------------------------
     std::vector<double> drsplit;
-    std::vector<double> tfsplit;
+    std::vector<double> tfesplit;
     double hbarc = 0.19732697;
     double GeVtofm = 1./hbarc; //~5.068;
     int id = 0;
-    for(int ip = 0; ip<partons.size(); ++ip) {
-      //std::cout << "1st split hard parton " << std::endl;
 
+    //std::cout<<"event "<<iev<<std::endl;
+    for(int ip = 0; ip<partons.size(); ++ip) {
+      //std::cout << "1st split hard parton "<<" ip: "<<ip<<" partons[ip]: "<<partons[ip]<<" partonsFirstSplit[id]: "<<partonsFirstSplit[id]<<" partonsFirstSplit[id+1]: "<<partonsFirstSplit[id+1] << std::endl;
+      //if(checkNanValues(id, partonsFirstSplit)==false) continue;//dummy values remove and find the issue again  
       PseudoJet p = partons[ip];
       PseudoJet d1 = partonsFirstSplit[id];
       PseudoJet d2 = partonsFirstSplit[id+1];
-      double dr = d1.delta_R(d2);
+      //if(!p.vertex() || !d1 || !d2) continue;
+      std::cout<<"p: "<<p<<" d1: "<<d1<<" d2: "<<d2<<std::endl;
+      std::cout<<"N event: "<<iev<<std::endl;
+      //double dr = d1.delta_R(d2);
+      double dr = std::sqrt(d1.squared_distance(d2));
+      
       drsplit.push_back(dr);
       double z1 = max(d1.e(),d2.e())/p.e();
       double z2 = min(d1.e(),d2.e())/p.e();
-      tfsplit.push_back(1./(2.*z1*z2*p.e()*GeVtofm*(1-fastjet::cos_theta(d1,d2))));
+      double zg = min(d1.pt(), d2.pt()) / (d1.pt() + d2.pt());
+      //std::cout<<"z1: "<<z1<<" z2: "<<z2<<" p.e(): "<<p.e()<<" dr: "<<dr<<" tf: "<<1./(2.*z1*z2*p.e()*GeVtofm*(1-fastjet::cos_theta(d1,d2)))<<std::endl;
+      //tfesplit.push_back(1./(2.*z1*z2*p.e()*GeVtofm*(1-fastjet::cos_theta(d1,d2))));
+      tfesplit.push_back(1./(2.*zg*(1-zg)*p.perp()*GeVtofm*(1-cos(dr/R))));
       //std::cout << "end of calculation " << std::endl;
  
       id+=2;
+      
     }
+    
     
     //---------------------------------------------------------------------------
     //   jet clustering
@@ -143,11 +176,11 @@ int main (int argc, char ** argv) {
     //std::cout << "jet clustering" << std::endl;
     // run the clustering, extract the signal jets
     fastjet::ClusterSequenceArea csSig(particlesSig, jet_def, area_def);
-    jetCollection jetCollectionSig(sorted_by_pt(jet_selector(csSig.inclusive_jets(10.))));
+    jetCollection jetCollectionSig(sorted_by_pt(jet_selector(csSig.inclusive_jets(15.))));
 
     // run the clustering, extract the signal charged jets
     fastjet::ClusterSequenceArea csSigCh(particlesSigCh, jet_def, area_def);
-    jetCollection jetCollectionSigCh(sorted_by_pt(jet_selector(csSigCh.inclusive_jets(10.))));
+    jetCollection jetCollectionSigCh(sorted_by_pt(jet_selector(csSigCh.inclusive_jets(15.))));
     
     //---------------------------------------------------------------------------
     //   Recursive Soft Drop for signal jets
@@ -162,29 +195,32 @@ int main (int argc, char ** argv) {
     sdcTau.run(jetCollectionSig);
 
     jetCollectionSig.addVector("sigJetRecur_jetpt",     sdcSig.getPts());
+    jetCollectionSig.addVector("sigJetRecur_jeteta",    sdcSig.getEtas());
+    jetCollectionSig.addVector("sigJetRecur_kt",        sdcSig.getKts());
     jetCollectionSig.addVector("sigJetRecur_z",         sdcSig.getZgs());
     jetCollectionSig.addVector("sigJetRecur_dr12",      sdcSig.getDRs());
     jetCollectionSig.addVector("sigJetRecur_erad",      sdcSig.getErads());
     jetCollectionSig.addVector("sigJetRecur_logdr12",   sdcSig.getLog1DRs());
     jetCollectionSig.addVector("sigJetRecur_logztheta", sdcSig.getLogzDRs());
-    jetCollectionSig.addVector("sigJetRecur_tf",        sdcSig.getTfs());
-    jetCollectionSig.addVector("sigJetRecur_tfe",       sdcSig.getTfes());
     jetCollectionSig.addVector("sigJetRecur_nSD",       sdcSig.calculateNSD(0.0));
     jetCollectionSig.addVector("sigJetRecur_zSD",       sdcSig.calculateNSD(1.0));
+    jetCollectionSig.addVector("sigJetRecur_tf",        sdcSig.getTfs());//high E & soft & collinear
+    jetCollectionSig.addVector("sigJetRecur_tfe",       sdcSig.getTfes());//high E (1-cos)
+    jetCollectionSig.addVector("sigJetRecur_tfe2",      sdcSig.getTfes2());//1->3 split
 
     jetCollectionSig.addVector("sigJetRecurTau_jetpt",     sdcTau.getPts());
+    jetCollectionSig.addVector("sigJetRecurTau_jeteta",    sdcTau.getEtas());
+    jetCollectionSig.addVector("sigJetRecurTau_kt",        sdcTau.getKts());
     jetCollectionSig.addVector("sigJetRecurTau_z",         sdcTau.getZgs());
     jetCollectionSig.addVector("sigJetRecurTau_dr12",      sdcTau.getDRs());
     jetCollectionSig.addVector("sigJetRecurTau_erad",      sdcTau.getErads());
     jetCollectionSig.addVector("sigJetRecurTau_logdr12",   sdcTau.getLog1DRs());
     jetCollectionSig.addVector("sigJetRecurTau_logztheta", sdcTau.getLogzDRs());
-    jetCollectionSig.addVector("sigJetRecurTau_tf",        sdcTau.getTfs());
-    jetCollectionSig.addVector("sigJetRecurTau_tfe",       sdcTau.getTfes());
     jetCollectionSig.addVector("sigJetRecurTau_nSD",       sdcTau.calculateNSD(0.0));
     jetCollectionSig.addVector("sigJetRecurTau_zSD",       sdcTau.calculateNSD(1.0));
-
-   // jetCollectionSig.addVector("sigJetRecurTauCaDiff_tf", sdcSig.getTfs()-sdcTau.getTfs());
-   // jetCollectionSig.addVector("sigJetRecurTauCaDIff_tfe", sdcSig.getTfes()-sdcTau.getTfes());
+    jetCollectionSig.addVector("sigJetRecurTau_tf",        sdcTau.getTfs());//high E & soft & collinear
+    jetCollectionSig.addVector("sigJetRecurTau_tfe",       sdcTau.getTfes());//high E (1-cos)
+    jetCollectionSig.addVector("sigJetRecurTau_tfe2",      sdcTau.getTfes2());//1->3 split
 
     // calculate some angularities
     vector<double> widthSig; widthSig.reserve(jetCollectionSig.getJet().size());
@@ -199,33 +235,24 @@ int main (int argc, char ** argv) {
     //find closest parton for each jet
     std::vector<int> partonmatch;
     std::vector<double> partonmatchdr;
-    //std::vector<double> taucaformationtimediff;
-    //std::vector<double> taucaformationtimediffTfes;
     std::vector<fastjet::PseudoJet> sigJets =  jetCollectionSig.getJet();
     for(fastjet::PseudoJet p : sigJets) {
       int ipmin = -1;
       double drmin = 999.;
-      //std::vector<fastjet::PseudoJet> diffTf;
-      //std::vector<fastjet::PseudoJet> diffTfes;
-      //double diffTf = sdcSig.getTfs()-sdcTau.getTfs();
-      //diffTfes = sdcSig.getTfes()-sdcTau.getTfes();
       for(int ip = 0; ip<partons.size(); ++ip) {
-        double dr = p.delta_R(partons[ip]);
-        if(dr<drmin) {
+        //double dr = p.delta_R(partons[ip]);//I could belive that smth is wrng here ..  
+        double dr = std::sqrt(p.squared_distance(partons[ip]));
+	if(dr<drmin) {//though it looks all reasonable, the fact that the partons ipmin is always 0 or 1 is suspicious to me...
           drmin = dr;
           ipmin = ip;
         }
       }
+      //std::cout<<"drmin: "<<drmin<<"      ipmin: "<<ipmin<<std::endl;
       partonmatch.push_back(ipmin);
       partonmatchdr.push_back(drmin);
-      //taucaformationtimediff.push_back(diffTf);
-      //taucaformationtimediffTfes.push_back(diffTfes);
     }
     jetCollectionSig.addVector("sigJetRecur_partonMatchID", partonmatch);
     jetCollectionSig.addVector("sigJetRecur_partonMatchDr", partonmatchdr);
-    //jetCollectionSig.addVector("formationtimeCadiffTau", taucaformationtimediff);
-    //jetCollectionSig.addVector("formationtimeCadiffTauTfes", taucaformationtimediffTfes);
-    //std::cout << "SD " << std::endl;
 
     softDropCounter sdcSigzcut(0.1,0.0,R,0.0);
     sdcSigzcut.setRecursiveAlgo(0);//0 = CA 1 = AKT 2 = KT  3=gen_kt t-form ordered
@@ -236,93 +263,67 @@ int main (int argc, char ** argv) {
     sdcSigTauzcut.run(jetCollectionSig);
     
     jetCollectionSig.addVector("sigJetRecurZcut_jetpt",     sdcSigzcut.getPts());
+    jetCollectionSig.addVector("sigJetRecurZcut_jeteta",    sdcSigzcut.getEtas());
+    jetCollectionSig.addVector("sigJetRecurZcut_kt",        sdcSigzcut.getKts());
     jetCollectionSig.addVector("sigJetRecurZcut_z",         sdcSigzcut.getZgs());
     jetCollectionSig.addVector("sigJetRecurZcut_dr12",      sdcSigzcut.getDRs());
     jetCollectionSig.addVector("sigJetRecurZcut_erad",      sdcSigzcut.getErads());
     jetCollectionSig.addVector("sigJetRecurZcut_logdr12",   sdcSigzcut.getLog1DRs());
     jetCollectionSig.addVector("sigJetRecurZcut_logztheta", sdcSigzcut.getLogzDRs());
-    jetCollectionSig.addVector("sigJetRecurZcut_tf",        sdcSigzcut.getTfs());
-    jetCollectionSig.addVector("sigJetRecurZcut_tfe",       sdcSigzcut.getTfes());
+    jetCollectionSig.addVector("sigJetRecurZcut_tf",        sdcSigzcut.getTfs());//high E & soft & collinear
+    jetCollectionSig.addVector("sigJetRecurZcut_tfe",       sdcSigzcut.getTfes());//high E (1-cos)
+    jetCollectionSig.addVector("sigJetRecurZcut_tfe2",      sdcSigzcut.getTfes2());//1->3 split
     jetCollectionSig.addVector("sigJetRecurZcut_nSD",       sdcSigzcut.calculateNSD(0.0));
     jetCollectionSig.addVector("sigJetRecurZcut_zSD",       sdcSigzcut.calculateNSD(1.0));
+    jetCollectionSig.addVector("sigJetRecurZcut_droppedBFS",sdcSigzcut.getDBFSs());
+    jetCollectionSig.addVector("sigJetRecurZcut_droppedTfBFS",sdcSigzcut.getDTfBFSs());
+    jetCollectionSig.addVector("sigJetRecurZcut_droppedTfeBFS",sdcSigzcut.getDTfeBFSs());
+    jetCollectionSig.addVector("sigJetRecurZcut_droppedPts",sdcSigzcut.getPtBFSs());
+    jetCollectionSig.addVector("sigJetRecurZcut_droppedKts",sdcSigzcut.getKtBFSs());
+    jetCollectionSig.addVector("sigJetRecurZcut_droppedLog1drBFS",sdcSigzcut.getLog1DrBFSs());
+    jetCollectionSig.addVector("sigJetRecurZcut_tau21",     sdcSigzcut.getTau21s());
+    jetCollectionSig.addVector("sigJetRecurZcut_tau32",     sdcSigzcut.getTau32s());
+
 
     jetCollectionSig.addVector("sigJetRecurTauZcut_jetpt",     sdcSigTauzcut.getPts());
+    jetCollectionSig.addVector("sigJetRecurTauZcut_jeteta",    sdcSigTauzcut.getEtas());
+    jetCollectionSig.addVector("sigJetRecurTauZcut_kt",        sdcSigTauzcut.getKts());
     jetCollectionSig.addVector("sigJetRecurTauZcut_z",         sdcSigTauzcut.getZgs());
     jetCollectionSig.addVector("sigJetRecurTauZcut_dr12",      sdcSigTauzcut.getDRs());
     jetCollectionSig.addVector("sigJetRecurTauZcut_erad",      sdcSigTauzcut.getErads());
     jetCollectionSig.addVector("sigJetRecurTauZcut_logdr12",   sdcSigTauzcut.getLog1DRs());
     jetCollectionSig.addVector("sigJetRecurTauZcut_logztheta", sdcSigTauzcut.getLogzDRs());
-    jetCollectionSig.addVector("sigJetRecurTauZcut_tf",        sdcSigTauzcut.getTfs());
-    jetCollectionSig.addVector("sigJetRecurTauZcut_tfe",       sdcSigTauzcut.getTfes());
+    jetCollectionSig.addVector("sigJetRecurTauZcut_tf",        sdcSigTauzcut.getTfs());//high E & soft & collinear
+    jetCollectionSig.addVector("sigJetRecurTauZcut_tfe",       sdcSigTauzcut.getTfes());// high E (1-cos)
+    jetCollectionSig.addVector("sigJetRecurTauZcut_tfe2",      sdcSigTauzcut.getTfes2());//1->3 split
     jetCollectionSig.addVector("sigJetRecurTauZcut_nSD",       sdcSigTauzcut.calculateNSD(0.0));
     jetCollectionSig.addVector("sigJetRecurTauZcut_zSD",       sdcSigTauzcut.calculateNSD(1.0));
+    jetCollectionSig.addVector("sigJetRecurTauZcut_droppedBFS",sdcSigTauzcut.getDBFSs());
+    jetCollectionSig.addVector("sigJetRecurTauZcut_droppedTfBFS",sdcSigTauzcut.getDTfBFSs());
+    jetCollectionSig.addVector("sigJetRecurTauZcut_droppedTfeBFS",sdcSigTauzcut.getDTfeBFSs());
+    jetCollectionSig.addVector("sigJetRecurTauZcut_droppedPts",sdcSigTauzcut.getPtBFSs());
+    jetCollectionSig.addVector("sigJetRecurTauZcut_droppedKts",sdcSigTauzcut.getKtBFSs());
+    jetCollectionSig.addVector("sigJetRecurTauZcut_droppedLog1drBFS",sdcSigTauzcut.getLog1DrBFSs());
 
-
-   // jetCollectionSig.addVector("sigJetRecurTauCaZcutdiff_tf", sdcSigzcut.getTfs()-sdcSigTauzcut.getTfs());
-   // jetCollectionSig.addVector("sigJetRecurTauCaZcutdiff_tfe", sdcSigzcut.getTfes()-sdcSigTauzcut.getTfes());
-
+    jetCollectionSig.addVector("sigJetRecurTauZcut_tau21",     sdcSigTauzcut.getTau21s());
+    jetCollectionSig.addVector("sigJetRecurTauZcut_tau32",     sdcSigTauzcut.getTau32s());
+   
     //---------------------------------------------------------------------------
-    //   jet clustering of charged-particle signal jets
+    //  Bkg subtraction - core dump if i dont execute this part !
     //---------------------------------------------------------------------------
-    softDropCounter sdcSigzcutCh(0.1,0.0,R,0.0);
-    sdcSigzcutCh.setRecursiveAlgo(0);//0 = CA 1 = AKT 2 = KT  3=gen_kt t-form ordered
-    sdcSigzcutCh.run(jetCollectionSigCh);
-
-    
-    jetCollectionSigCh.addVector("sigJetChRecurZcut_jetpt",     sdcSigzcutCh.getPts());
-    jetCollectionSigCh.addVector("sigJetChRecurZcut_z",         sdcSigzcutCh.getZgs());
-    jetCollectionSigCh.addVector("sigJetChRecurZcut_dr12",      sdcSigzcutCh.getDRs());
-    jetCollectionSigCh.addVector("sigJetChRecurZcut_erad",      sdcSigzcutCh.getErads());
-    jetCollectionSigCh.addVector("sigJetChRecurZcut_logdr12",   sdcSigzcutCh.getLog1DRs());
-    jetCollectionSigCh.addVector("sigJetChRecurZcut_logztheta", sdcSigzcutCh.getLogzDRs());
-    jetCollectionSigCh.addVector("sigJetChRecurZcut_tf",        sdcSigzcutCh.getTfs());
-    jetCollectionSigCh.addVector("sigJetChRecurZcut_tfe",       sdcSigzcutCh.getTfes());
-    jetCollectionSigCh.addVector("sigJetChRecurZcut_nSD",       sdcSigzcutCh.calculateNSD(0.0));
-    jetCollectionSigCh.addVector("sigJetChRecurZcut_zSD",       sdcSigzcutCh.calculateNSD(1.0));
-
-    //find closest parton for each charged jet
-    std::vector<int> partonmatchCh;
-    std::vector<double> partonmatchdrCh;
-    std::vector<fastjet::PseudoJet> sigJetsCh =  jetCollectionSigCh.getJet();
-    for(fastjet::PseudoJet p : sigJetsCh) {
-      int ipmin = -1;
-      double drmin = 999.;
-      for(int ip = 0; ip<partons.size(); ++ip) {
-        double dr = p.delta_R(partons[ip]);
-        if(dr<drmin) {
-          drmin = dr;
-          ipmin = ip;
-        }
-      }
-      partonmatchCh.push_back(ipmin);
-      partonmatchdrCh.push_back(drmin);
-    }
-    jetCollectionSigCh.addVector("sigJetChRecur_partonMatchID", partonmatchCh);
-    jetCollectionSigCh.addVector("sigJetChRecur_partonMatchDr", partonmatchdrCh);
-    
-
-    //---------------------------------------------------------------------------
-    //   jet clustering of signal+background jets
-    //---------------------------------------------------------------------------
-
-    fastjet::ClusterSequenceArea csRaw(particlesMerged, jet_def, area_def);
-    jetCollection jetCollectionRaw(sorted_by_pt(jet_selector(csRaw.inclusive_jets(10.))));
-
-    //---------------------------------------------------------------------------
-    //   background subtraction
-    //---------------------------------------------------------------------------
-
-    //run jet-by-jet constituent subtraction on mixed (hard+UE) event
-    csSubtractor csSub(R, 0., -1, 0.005,ghostRapMax,2.5);
+   // csSubtractor csSub(R, 0., 0.1, 0.005,1);//Values from Bas - here it breaks.
+   // double rJet = 0.4, double alpha = 1., double rParam = -1., double ghostArea = 0.005, double ghostRapMax = 3.0, double jetRapMax = 3.0
+    csSubtractor csSub(R, 0., -1, 0.005,ghostRapMax,2.5);//Values from Marta jettoy - here it runs
     csSub.setInputParticles(particlesMerged);
     jetCollection jetCollectionCS(csSub.doSubtraction());
 
     //Background densities used by constituent subtraction
-    std::vector<double> rho;
-    std::vector<double> rhom;
-    rho.push_back(csSub.getRho());
-    rhom.push_back(csSub.getRhoM());
-
+    
+    //std::vector<double> rho;
+    //std::vector<double> rhom;
+    //rho.push_back(csSub.getRho());
+    //rhom.push_back(csSub.getRhoM());
+    
     //match CS jets to signal jets
     jetMatcher jmCS(R);
     jmCS.setBaseJets(jetCollectionCS);
@@ -332,70 +333,28 @@ int main (int argc, char ** argv) {
     jmCS.reorderedToTag(jetCollectionCS);
 
     //---------------------------------------------------------------------------
-    //  recluster subtracted jets
+    //   Full event constituent subtraction -- this one
     //---------------------------------------------------------------------------
-    softDropCounter sdcCS(0.0,0.0,R,0.0);
-    sdcCS.setRecursiveAlgo(0);//0 = CA 1 = AKT 2 = KT  3=gen_kt t-form ordered
-    sdcCS.run(jetCollectionCS);
 
-    jetCollectionCS.addVector("csJetRecur_jetpt",     sdcCS.getPts());
-    jetCollectionCS.addVector("csJetRecur_z",         sdcCS.getZgs());
-    jetCollectionCS.addVector("csJetRecur_dr12",      sdcCS.getDRs());
-    jetCollectionCS.addVector("csJetRecur_erad",      sdcCS.getErads());
-    jetCollectionCS.addVector("csJetRecur_logdr12",   sdcCS.getLog1DRs());
-    jetCollectionCS.addVector("csJetRecur_logztheta", sdcCS.getLogzDRs());
-    jetCollectionCS.addVector("csJetRecur_tf",        sdcCS.getTfs());
-    jetCollectionCS.addVector("csJetRecur_tfe",       sdcCS.getTfes());
-    jetCollectionCS.addVector("csJetRecur_nSD",       sdcCS.calculateNSD(0.0));
-    jetCollectionCS.addVector("csJetRecur_zSD",       sdcCS.calculateNSD(1.0));
+    //csSubtractorFullEvent csSubFull( 0., 0.1, 0.005, 1);  // alpha, rParam, ghA, ghRapMax -> values from Bas = here it doesn't break ?!
+    //csSubtractorFullEvent csSubFull( 0., 0.25, 0.005, 2.5);  // alpha, rParam, ghA, ghRapMax -> double check with bas
+    // csSubFull.setRho(csSub.getRho());//  Or should this be inherited from the jet-by-jet CS above ?!
+    // csSubFull.setRhom(csSub.getRhoM());
+    // csSubFull.setMaxEta(1.0);
+    // csSubFull.setInputParticles(particlesMerged);
+    //New CS subtraction - iteratively:
 
-    //find closest parton for each jet
-    std::vector<int> partonmatchCS;
-    std::vector<double> partonmatchdrCS;
-    std::vector<fastjet::PseudoJet> csJets =  jetCollectionCS.getJet();
-    for(fastjet::PseudoJet p : csJets) {
-      int ipmin = -1;
-      double drmin = 999.;
-      for(int ip = 0; ip<partons.size(); ++ip) {
-        double dr = p.delta_R(partons[ip]);
-        if(dr<drmin) {
-          drmin = dr;
-          ipmin = ip;
-        }
-      }
-      partonmatchCS.push_back(ipmin);
-      partonmatchdrCS.push_back(drmin);
-    }
-    jetCollectionCS.addVector("csJetRecur_partonMatchID", partonmatchCS);
-    jetCollectionCS.addVector("csJetRecur_partonMatchDr", partonmatchdrCS);
+    csSubFullEventIterative csSubEmbedded( {0.0} , {0.1}, 0.005,ghostRapMax); // alpha, rParam, ghA, ghRapMax
+    csSubEmbedded.setInputParticles(particlesMerged);
+    csSubEmbedded.setMaxEta(1.0);
+    fastjet::ClusterSequenceArea csEmbedded(csSubEmbedded.Subtract(), jet_def, area_def);
+    jetCollection jetCollectionCSFull(sorted_by_pt(jet_selector(csEmbedded.inclusive_jets(15.)))); 
 
-    softDropCounter sdcCSzcut(0.1,0.0,R,0.0);
-    sdcCSzcut.setRecursiveAlgo(0);//0 = CA 1 = AKT 2 = KT  3=gen_kt t-form ordered
-    sdcCSzcut.run(jetCollectionCS);
-
+    std::vector<double> rho;
+    std::vector<double> rhom;
+    rho.push_back(csSubEmbedded.getRho());
+    rhom.push_back(csSubEmbedded.getRhoM());
     
-    jetCollectionCS.addVector("csJetRecurZcut_jetpt",     sdcCSzcut.getPts());
-    jetCollectionCS.addVector("csJetRecurZcut_z",         sdcCSzcut.getZgs());
-    jetCollectionCS.addVector("csJetRecurZcut_dr12",      sdcCSzcut.getDRs());
-    jetCollectionCS.addVector("csJetRecurZcut_erad",      sdcCSzcut.getErads());
-    jetCollectionCS.addVector("csJetRecurZcut_logdr12",   sdcCSzcut.getLog1DRs());
-    jetCollectionCS.addVector("csJetRecurZcut_logztheta", sdcCSzcut.getLogzDRs());
-    jetCollectionCS.addVector("csJetRecurZcut_tf",        sdcCSzcut.getTfs());
-    jetCollectionCS.addVector("csJetRecurZcut_tfe",       sdcCSzcut.getTfes());
-    jetCollectionCS.addVector("csJetRecurZcut_nSD",       sdcCSzcut.calculateNSD(0.0));
-    jetCollectionCS.addVector("csJetRecurZcut_zSD",       sdcCSzcut.calculateNSD(1.0));
-
-    //---------------------------------------------------------------------------
-    //   Full event constituent subtraction
-    //---------------------------------------------------------------------------
-    csSubtractorFullEvent csSubFull( 0., 0.25, 0.005, 2.5);  // alpha, rParam, ghA, ghRapMax
-    csSubFull.setRho(csSub.getRho());
-    csSubFull.setRhom(csSub.getRhoM());
-    csSubFull.setInputParticles(particlesMerged);
-    
-    fastjet::ClusterSequenceArea fullSig(csSubFull.doSubtraction(), jet_def, area_def);
-    jetCollection jetCollectionCSFull(sorted_by_pt(jet_selector(fullSig.inclusive_jets(10.)))); 
-
     //match CSFull jets to signal jets
     jetMatcher jmCSFull(R);
     jmCSFull.setBaseJets(jetCollectionCSFull);
@@ -412,6 +371,8 @@ int main (int argc, char ** argv) {
     sdcCSFull.run(jetCollectionCSFull);
 
     jetCollectionCSFull.addVector("csFullJetRecur_jetpt",     sdcCSFull.getPts());
+    jetCollectionCSFull.addVector("csFullJetRecur_jeteta",    sdcCSFull.getEtas());
+    jetCollectionCSFull.addVector("csFullJetRecur_kt",        sdcCSFull.getKts());
     jetCollectionCSFull.addVector("csFullJetRecur_z",         sdcCSFull.getZgs());
     jetCollectionCSFull.addVector("csFullJetRecur_dr12",      sdcCSFull.getDRs());
     jetCollectionCSFull.addVector("csFullJetRecur_erad",      sdcCSFull.getErads());
@@ -419,8 +380,27 @@ int main (int argc, char ** argv) {
     jetCollectionCSFull.addVector("csFullJetRecur_logztheta", sdcCSFull.getLogzDRs());
     jetCollectionCSFull.addVector("csFullJetRecur_tf",        sdcCSFull.getTfs());
     jetCollectionCSFull.addVector("csFullJetRecur_tfe",       sdcCSFull.getTfes());
+    jetCollectionCSFull.addVector("csFullJetRecur_tfe2",      sdcCSFull.getTfes2());//highE 1->3 split
     jetCollectionCSFull.addVector("csFullJetRecur_nSD",       sdcCSFull.calculateNSD(0.0));
     jetCollectionCSFull.addVector("csFullJetRecur_zSD",       sdcCSFull.calculateNSD(1.0));
+
+    softDropCounter sdcCSFullTau(0.0,0.0,R,0.0);
+    sdcCSFullTau.setRecursiveAlgo(3);//0 = CA 1 = AKT 2 = KT  3=gen_kt t-form ordered
+    sdcCSFullTau.run(jetCollectionCSFull);
+
+    jetCollectionCSFull.addVector("csFullJetRecurTau_jetpt",     sdcCSFullTau.getPts());
+    jetCollectionCSFull.addVector("csFullJetRecurTau_jeteta",    sdcCSFullTau.getEtas());
+    jetCollectionCSFull.addVector("csFullJetRecurTau_kt",        sdcCSFullTau.getKts());
+    jetCollectionCSFull.addVector("csFullJetRecurTau_z",         sdcCSFullTau.getZgs());
+    jetCollectionCSFull.addVector("csFullJetRecurTau_dr12",      sdcCSFullTau.getDRs());
+    jetCollectionCSFull.addVector("csFullJetRecurTau_erad",      sdcCSFullTau.getErads());
+    jetCollectionCSFull.addVector("csFullJetRecurTau_logdr12",   sdcCSFullTau.getLog1DRs());
+    jetCollectionCSFull.addVector("csFullJetRecurTau_logztheta", sdcCSFullTau.getLogzDRs());
+    jetCollectionCSFull.addVector("csFullJetRecurTau_tf",        sdcCSFullTau.getTfs());
+    jetCollectionCSFull.addVector("csFullJetRecurTau_tfe",       sdcCSFullTau.getTfes());
+    jetCollectionCSFull.addVector("csFullJetRecurTau_tfe2",      sdcCSFullTau.getTfes2());//highE 1->3 split
+    jetCollectionCSFull.addVector("csFullJetRecurTau_nSD",       sdcCSFullTau.calculateNSD(0.0));
+    jetCollectionCSFull.addVector("csFullJetRecurTau_zSD",       sdcCSFullTau.calculateNSD(1.0));
 
     //find closest parton for each jet
     std::vector<int> partonmatchCSFull;
@@ -448,16 +428,54 @@ int main (int argc, char ** argv) {
 
     
     jetCollectionCSFull.addVector("csFullJetRecurZcut_jetpt",     sdcCSFullzcut.getPts());
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_jeteta",    sdcCSFullzcut.getEtas());
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_kt",        sdcCSFullzcut.getKts());
     jetCollectionCSFull.addVector("csFullJetRecurZcut_z",         sdcCSFullzcut.getZgs());
     jetCollectionCSFull.addVector("csFullJetRecurZcut_dr12",      sdcCSFullzcut.getDRs());
     jetCollectionCSFull.addVector("csFullJetRecurZcut_erad",      sdcCSFullzcut.getErads());
     jetCollectionCSFull.addVector("csFullJetRecurZcut_logdr12",   sdcCSFullzcut.getLog1DRs());
     jetCollectionCSFull.addVector("csFullJetRecurZcut_logztheta", sdcCSFullzcut.getLogzDRs());
-    jetCollectionCSFull.addVector("csFullJetRecurZcut_tf",        sdcCSFullzcut.getTfs());
-    jetCollectionCSFull.addVector("csFullJetRecurZcut_tfe",       sdcCSFullzcut.getTfes());
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_tf",        sdcCSFullzcut.getTfs());//high E & soft & colliner
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_tfe",       sdcCSFullzcut.getTfes());//high E (1-cos)
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_tfe2",      sdcCSFullzcut.getTfes2());//highE 1->3 split
     jetCollectionCSFull.addVector("csFullJetRecurZcut_nSD",       sdcCSFullzcut.calculateNSD(0.0));
     jetCollectionCSFull.addVector("csFullJetRecurZcut_zSD",       sdcCSFullzcut.calculateNSD(1.0));
-    
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_droppedBFS",sdcCSFullzcut.getDBFSs());
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_droppedTfBFS",sdcCSFullzcut.getDTfBFSs());
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_droppedTfeBFS",sdcCSFullzcut.getDTfeBFSs());
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_droppedPts",sdcCSFullzcut.getPtBFSs());
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_droppedKts",sdcCSFullzcut.getKtBFSs());
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_droppedLog1drBFS",sdcCSFullzcut.getLog1DrBFSs());
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_tau21",     sdcCSFullzcut.getTau21s());
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_tau32",     sdcCSFullzcut.getTau32s());
+
+    // add the tau here
+    softDropCounter sdcCSFullTauzcut(0.1,0.0,R,0.0);
+    sdcCSFullTauzcut.setRecursiveAlgo(3);//0 = CA 1 = AKT 2 = KT  3=gen_kt t-form ordered
+    sdcCSFullTauzcut.run(jetCollectionCSFull);
+ 
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_jetpt",     sdcCSFullTauzcut.getPts());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_jeteta",    sdcCSFullTauzcut.getEtas());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_kt",        sdcCSFullTauzcut.getKts());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_z",         sdcCSFullTauzcut.getZgs());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_dr12",      sdcCSFullTauzcut.getDRs());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_erad",      sdcCSFullTauzcut.getErads());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_logdr12",   sdcCSFullTauzcut.getLog1DRs());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_logztheta", sdcCSFullTauzcut.getLogzDRs());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_tf",        sdcCSFullTauzcut.getTfs());//highE & soft & collinear
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_tfe",       sdcCSFullTauzcut.getTfes());//high E (1-cos)
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_tfe2",      sdcCSFullTauzcut.getTfes2());//highE 1->3 split
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_nSD",       sdcCSFullTauzcut.calculateNSD(0.0));
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_zSD",       sdcCSFullTauzcut.calculateNSD(1.0));
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_droppedBFS",sdcCSFullTauzcut.getDBFSs());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_droppedTfBFS",sdcCSFullTauzcut.getDTfBFSs());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_droppedTfeBFS",sdcCSFullTauzcut.getDTfeBFSs());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_droppedPts",sdcCSFullTauzcut.getPtBFSs());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_droppedKts",sdcCSFullTauzcut.getKtBFSs());
+    jetCollectionCSFull.addVector("csFullJetRecurTauZcut_droppedLog1drBFS",sdcCSFullTauzcut.getLog1DrBFSs());
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_tau21",     sdcCSFullzcut.getTau21s());
+    jetCollectionCSFull.addVector("csFullJetRecurZcut_tau32",     sdcCSFullzcut.getTau32s());
+
     //---------------------------------------------------------------------------
     //   write tree
     //---------------------------------------------------------------------------
@@ -471,13 +489,12 @@ int main (int argc, char ** argv) {
 
     trwSig.addPartonCollection("partons",       partons);
     trwSig.addPartonCollection("partonsFirstSplit",       partonsFirstSplit);
-    trwSig.addDoubleCollection("drSplit", drsplit);
-    trwSig.addDoubleCollection("tfSplit", tfsplit);
+    trwSig.addDoubleCollection("drsplit", drsplit);
+    trwSig.addDoubleCollection("tfesplit", tfesplit);
     
     trwSig.addCollection("sigJet",        jetCollectionSig);
     trwSig.addCollection("sigJetCh",      jetCollectionSigCh);
 
-    trwSig.addCollection("csJet",         jetCollectionCS);
     trwSig.addCollection("csFullJet",         jetCollectionCSFull);
     
     trwSig.fillTree();  //signal jets
@@ -487,9 +504,7 @@ int main (int argc, char ** argv) {
   Bar.Print();
   Bar.PrintLine();
 
-  TFile *fout = new TFile("JetToyHIResultTimeClusBkg.root","RECREATE");
   trwSig.getTree()->Write();
-  
   fout->Write();
   fout->Close();
 

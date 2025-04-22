@@ -252,7 +252,7 @@ std::vector<fastjet::PseudoJet> dyGroomer::doGrooming()
       fastjet::PseudoJet CurrentJet = tempJets[0];
       //std::cout<<"======================CurrentJet "<< CurrentJet <<std::endl;
       fastjet::PseudoJet piece1, piece2;
-      double min_kappa = 1e8;
+      //double min_kappa = 1e8;
       double min_tf = 1e8;
       //double zg = -1.;
       //double deltaR = -1;
@@ -280,7 +280,7 @@ std::vector<fastjet::PseudoJet> dyGroomer::doGrooming()
      double pt = piece1.pt() + piece2.pt();
      double zg = min(piece1.pt(), piece2.pt()) / pt;
      double deltaR = piece1.delta_R(piece2);
-     double kap = getKappa(pt,deltaR,zg);
+    // double kap = getKappa(pt,deltaR,zg);
 
      double hbarc = 0.19732697;
      double GeVtofm = 1./hbarc; //~5.068;
@@ -288,7 +288,7 @@ std::vector<fastjet::PseudoJet> dyGroomer::doGrooming()
      double z1 = max(piece1.e(),piece2.e())/CurrentJet.e();
      double z2 = min(piece1.e(),piece2.e())/CurrentJet.e();
      double tf = (2./(zg*(1.-zg)*CurrentJet.perp()*GeVtofm*deltaR*deltaR));// actually this is missing: /r0_/r0_)); but r/r = 1 ...
-     double tfe = (1./(2.*z1*z2*CurrentJet.e()*GeVtofm*(1-fastjet::cos_theta(piece1,piece2))));//sj1,sj2
+     //double tfe = (1./(2.*z1*z2*CurrentJet.e()*GeVtofm*(1-fastjet::cos_theta(piece1,piece2))));//sj1,sj2
 
      if(tf < min_tf) {// shouldn't this criterium be pt based (eg soft and hard limit transition)
         min_tf = tf; //tfe gives different values for the printout here and the one below - tf is consistent and also reduces pt while decreasing tf !
