@@ -1,0 +1,1 @@
+curl -k --cert ~/.globus/usercert.pem --cert-type PEM --key ~/.globus/userkey.pem https://alimonitor.cern.ch/train-workdir/tests/0049/00495967/AO2D.root -o test.root
