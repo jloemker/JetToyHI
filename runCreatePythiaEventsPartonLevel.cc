@@ -64,7 +64,16 @@ int main (int argc, char ** argv)
 
     //create pythia event
     std::vector<fastjet::PseudoJet> particlesSig = pyt.createPythiaEvent();
-   
+
+    std::vector<fastjet::PseudoJet> partons = pyt.getPartonList();
+    for(fastjet::PseudoJet p : partons) {
+      const int & pdgid = p.user_info<extraInfo>().pdg_id();
+      const int & vtx   = p.user_info<extraInfo>().vertex_number();
+      fout << p.px() << " " << p.py() << " " << p.pz() << " " << p.m() << " " << pdgid << " " << vtx << "\n";
+    }
+
+    //shoud I add here the Parton list as in the runCreatePythiaEvent.cc ?? 
+    //bc. for now I have 0 outgoing particles...   
     for(fastjet::PseudoJet p : particlesSig) {
       const int & pdgid = p.user_info<extraInfo>().pdg_id();
       const int & vtx   = p.user_info<extraInfo>().vertex_number();

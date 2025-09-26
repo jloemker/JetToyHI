@@ -30,7 +30,7 @@ private :
   bool   partonLevel_;
   bool   vinciaShower_;
   int    process_;      //0: dijet; 1: prompt photon
-
+  int nev = 0;
   std::vector<fastjet::PseudoJet> partons;
 
 public :
@@ -86,8 +86,7 @@ std::vector<fastjet::PseudoJet> pythiaEvent::createPythiaEvent() {
   std::vector<fastjet::PseudoJet> particles;
   partons.clear(); //empty list before storing partons of new event
 
-  //int iprint = 0;
-  
+  int iprint = 0;
   for (int i = 0; i < pythia.event.size(); ++i) {
     if (pythia.event[i].isFinal()) { //all final state particles
       fastjet::PseudoJet p(pythia.event[i].px(),pythia.event[i].py(),pythia.event[i].pz(),pythia.event[i].e());
@@ -98,7 +97,6 @@ std::vector<fastjet::PseudoJet> pythiaEvent::createPythiaEvent() {
       fastjet::PseudoJet p(pythia.event[i].px(),pythia.event[i].py(),pythia.event[i].pz(),pythia.event[i].e());
       p.set_user_info(new extraInfo(pythia.event[i].id(), -1)); 
       partons.push_back(p);
-      
       //find the case where the splitting to two separate daughters happens
       int d1 = pythia.event[i].daughter1();
       int d2 = pythia.event[i].daughter2();
@@ -154,8 +152,11 @@ std::vector<fastjet::PseudoJet> pythiaEvent::createPythiaEvent() {
       }
     }
   }
-
-  //if(iprint==1) pythia.event.list();
+  nev += 1;
+  if(iprint==1){
+    pythia.event.list();
+    std::cout<<"Number of event "<<nev<<std::endl;
+  }
   
   return particles;
 }

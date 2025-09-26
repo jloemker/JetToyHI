@@ -31,7 +31,7 @@ int main (int argc, char ** argv)
   //unsigned int nEvent    = 10000;
 
   //event generator settings
-  double       ptHat = cmdline.value<double>("-pthat",120);//120.;
+  double       ptHat = cmdline.value<double>("-pthat",180);//120.;
   unsigned int tune  = cmdline.value<int>("-tune",14);
 
   std::cout << "generating " << nEvent << " events with pthat = " << ptHat << " and tune = " << tune << std::endl;  
@@ -58,8 +58,6 @@ int main (int argc, char ** argv)
     //---------------------------------------------------------------------------
 
     fout << "# event " << ie << "\n";
-   
-    //create pythia event
     std::vector<fastjet::PseudoJet> particlesSig = pyt.createPythiaEvent();
     fout << "weight " << pyt.getWeight() <<  " pthat " << pyt.getPtHat() << "\n"; //<< " weight " << pow(15./pyt.getPtHat(),4.5)
 

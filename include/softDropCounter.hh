@@ -259,9 +259,11 @@ void softDropCounter::run()
       bool beforeFirstSplit = true;
       bool secondSplit = false;
       bool thirdSplit = false;
+      bool fullJet = true;
       double z03 = 0;
       double ptJet = 0;
       fastjet::PseudoJet sj3;//for 1->3 split
+      fastjet::PseudoJet FullJet;
       while(CurrentJet.has_parents(Part1, Part2))
       {
          if(CurrentJet.pt2() <= 0)
@@ -291,9 +293,19 @@ void softDropCounter::run()
 
          //double z1 = max(sj1.e(),sj2.e())/CurrentJet.e();
          //double z2 = min(sj1.e(),sj2.e())/CurrentJet.e();
-         double Threshold = zcut_ * std::pow(DeltaR / r0_, beta_);
+         
+         if(fullJet == true){
+           FullJet = CurrentJet;
+	   fullJet = false;
+	 }
+	 
+	 double Threshold = zcut_ * std::pow(DeltaR / r0_, beta_);
          if(zg >= Threshold)   // yay
-         {
+	 {
+           if(fullJet == true){
+             FullJet = CurrentJet;
+             fullJet = false;
+            }
             beforeFirstSplit = false;
             z.push_back(zg);
             dr.push_back(DeltaR);
@@ -375,14 +387,21 @@ void softDropCounter::run()
       // N-subjettiness with Unnormalized Measure (in GeV)
       // beta = 1.0:  One-Winner-Take-All kT Axes
       // beta = 2.0:  One-pass E-Scheme kT Axes
-
-      double beta = 2;                                                                                 
-      fastjet::contrib::NsubjettinessRatio nSub21_beta2(2,1, fastjet::contrib::CA_Axes(), fastjet::contrib::UnnormalizedMeasure(beta));
-      fastjet::contrib::NsubjettinessRatio nSub32_beta2(3,2, fastjet::contrib::CA_Axes(), fastjet::contrib::UnnormalizedMeasure(beta));
+      fastjet::PseudoJet FullPart1, FullPart2;
+      double tau21_beta2;
+      double tau32_beta2;
+      if(FullJet.has_structure()){
+        double beta = 2;                                                                                 
+        fastjet::contrib::NsubjettinessRatio nSub21_beta2(2,1, fastjet::contrib::CA_Axes(), fastjet::contrib::UnnormalizedMeasure(beta));//use CA and kt  --check defualt vs Unnorm.
+        fastjet::contrib::NsubjettinessRatio nSub32_beta2(3,2, fastjet::contrib::KT_Axes(), fastjet::contrib::UnnormalizedMeasure(beta));
   
-      double tau21_beta2 = nSub21_beta2(CurrentJet);                                                  
-      double tau32_beta2 = nSub32_beta2(CurrentJet);                                                  
-
+        tau21_beta2 = nSub21_beta2(FullJet);                                                  
+        tau32_beta2 = nSub32_beta2(FullJet);                                                  
+      }else{
+        tau21_beta2 = -99;
+	tau32_beta2 = -99;
+    
+      }
       tau21s_.push_back(tau21_beta2);                                                                         
       tau32s_.push_back(tau32_beta2); 
    }

@@ -13,6 +13,7 @@
 #include "PU14/EventMixer.hh"
 #include "PU14/CmdLine.hh"
 #include "PU14/PU14.hh"
+#include "PU14/EventSource.hh"
 
 #include "include/jetCollection.hh"
 #include "include/softDropGroomer.hh"
@@ -32,7 +33,6 @@ using namespace fastjet;
 // This class runs time reclustering with background
 
 // ./runTimeClusBkg -hard samples/PythiaEventsTune14PtHat120_10k.pu14 -pileup samples/ThermalEventsMult7000PtAv1.20_0.pu14 -nev 10
-
 bool checkNanValues(int id, vector<PseudoJet> partonsFirstSplit){
   if(partonsFirstSplit[id].m()<0.0000005 || partonsFirstSplit[id+1].m()<0.0000005 || partonsFirstSplit[id].pt()>500000000 || partonsFirstSplit[id+1].pt()>500000000 || partonsFirstSplit[id].pt()<0.05 || partonsFirstSplit[id+1].pt()<0.05 || !partonsFirstSplit[id].pt() || !partonsFirstSplit[id+1].pt() || !partonsFirstSplit[id].m() || !partonsFirstSplit[id+1].m() || partonsFirstSplit[id].rap() < 0.00001 || partonsFirstSplit[id+1].rap()<0.00001 || partonsFirstSplit[id].m() =='inf' || partonsFirstSplit[id+1].m() =='inf' || partonsFirstSplit[id].m() =='-nan' || partonsFirstSplit[id+1].m() =='-nan'){
    return false;
@@ -63,7 +63,7 @@ int main (int argc, char ** argv) {
   treeWriter trwSig("jetTreeSig");
  
   //Jet definition
-  double R                   = 0.2;
+  double R                   = 0.4;
   double ghostRapMax         = 6.0;
   double ghost_area          = 0.005;
   int    active_area_repeats = 1;
@@ -94,14 +94,12 @@ int main (int argc, char ** argv) {
     }
     // increment event number    
     iev++;
-   // std::cout << "begin " << std::endl;
     Bar.Update(iev);
     Bar.PrintWithMod(entryDiv);
     std::vector<fastjet::PseudoJet> particlesPileup = thrmEvent.createThermalEventAlice();//Bas
     thrmEvent.createThermalEventAlice();//Bas
 
     std::vector<fastjet::PseudoJet> particlesMergedAll = mixer.particles();
-
     std::vector<double> eventWeight;
     eventWeight.push_back(mixer.hard_weight());
     eventWeight.push_back(mixer.pu_weight());
@@ -138,36 +136,102 @@ int main (int argc, char ** argv) {
     //---------------------------------------------------------------------------
     std::vector<double> drsplit;
     std::vector<double> tfesplit;
+    std::vector<double> zgsplit;
+    std::vector<double> ktsplit;
+    std::vector<double> partonWd1Wod2pt;
+    std::vector<double> partonWod1Wd2pt;
+    std::vector<double> partonWd1d2pt;
+    std::vector<double> partonWod1d2pt;
     double hbarc = 0.19732697;
     double GeVtofm = 1./hbarc; //~5.068;
     int id = 0;
 
+    //trwSig.addDoubleCollection("partonWoConst", partonWoConst);// to check for parton pt of those that don't split 
+    //for(int ip = 0; ip<std::min(particlesMergedAll.size(),6); ++ip) {
+    std::cout<<"N event: "<<iev<<std::endl;
+    int particlesSize = particlesMergedAll.size();
+    for(int ip = 0; ip< std::min(particlesSize,6); ++ip) {
+      bool d1True=false;
+      bool d2True=false;
+      PseudoJet p = particlesMergedAll[ip];
+      PseudoJet d1;
+      PseudoJet d2;
+      int vtx = p.user_info<PU14>().vertex_number();
+      if(vtx != -1) continue;
+      
+      if(vtx == -1) {
+        if( (ip+1) < particlesMergedAll.size() ){
+          d1 = particlesMergedAll[ip+1];
+          if(d1.user_info<PU14>().vertex_number()==-2){ // std::cout << "yay daughter 1" << std::endl;
+	    d1True=true;
+	  }else{
+	    std::cout<<" no 1st daughter, but enough entries "<<std::endl;
+	  }
+          if( (ip+2) < particlesMergedAll.size() ){
+	    d2 = particlesMergedAll[ip+2];
+	    if(d2.user_info<PU14>().vertex_number()==-2){ // std::cout << "yay daughter 2" << std::endl;
+	      d2True=true;
+	    }else{
+	      std::cout<<" no 2nd daughter, but enough entries "<<std::endl;
+	    }
+	  }else{
+	    std::cout<<"no entries for 2nd daughter"<<std::endl;
+	  }  
+	}else{
+          std::cout<<"no entries 1st daughter"<<std::endl;
+	}
+
+        if( (d1True==true) && (d2True==true)){ // std::cout << "yay both daughters" << std::endl;
+          partonWd1d2pt.push_back(p.pt());
+          double dr = std::sqrt(d1.squared_distance(d2));
+          double kt = min(d1.pt(), d2.pt())*dr;
+          drsplit.push_back(dr);
+          ktsplit.push_back(kt);
+          double zg = min(d1.pt(), d2.pt()) / (d1.pt() + d2.pt());
+	  zgsplit.push_back(zg);
+          tfesplit.push_back(1./(2.*zg*(1-zg)*p.perp()*GeVtofm*(1-cos(dr))));
+
+        }else{//to make sure that the matching still works out !
+	  drsplit.push_back(-99);
+	  ktsplit.push_back(-99);
+	  zgsplit.push_back(-99);
+	  tfesplit.push_back(-99);
+	}
+        if( (d1True==true) && (d2True==false)){
+          partonWd1Wod2pt.push_back(p.pt());
+        }
+        if( (d1True==false) && (d2True==true)){
+          partonWod1Wd2pt.push_back(p.pt());
+        }
+        if( (d1True==false) && (d2True==false)){
+          partonWod1d2pt.push_back(p.pt());
+        }
+      }
+    }
     //std::cout<<"event "<<iev<<std::endl;
+
+    /*
+    // old version
     for(int ip = 0; ip<partons.size(); ++ip) {
-      //std::cout << "1st split hard parton "<<" ip: "<<ip<<" partons[ip]: "<<partons[ip]<<" partonsFirstSplit[id]: "<<partonsFirstSplit[id]<<" partonsFirstSplit[id+1]: "<<partonsFirstSplit[id+1] << std::endl;
-      //if(checkNanValues(id, partonsFirstSplit)==false) continue;//dummy values remove and find the issue again  
+      std::cout<<"N event: "<<iev<<std::endl;
+      std::cout << "1st split hard parton "<<" ip: "<<ip<<" partons[ip]: "<<partons[ip]<<"\n";
+      std::cout<<"partonsFirstSplit[id]: "<<partonsFirstSplit[id]<<"\n";
+      std::cout<<"partonsFirstSplit[id+1]: "<<partonsFirstSplit[id+1] << std::endl;
       PseudoJet p = partons[ip];
       PseudoJet d1 = partonsFirstSplit[id];
       PseudoJet d2 = partonsFirstSplit[id+1];
-      //if(!p.vertex() || !d1 || !d2) continue;
-      std::cout<<"p: "<<p<<" d1: "<<d1<<" d2: "<<d2<<std::endl;
-      std::cout<<"N event: "<<iev<<std::endl;
-      //double dr = d1.delta_R(d2);
       double dr = std::sqrt(d1.squared_distance(d2));
-      
+      double kt = min(d1.pt(), d2.pt())*dr; 
       drsplit.push_back(dr);
+      ktsplit.push_back(kt);
       double z1 = max(d1.e(),d2.e())/p.e();
       double z2 = min(d1.e(),d2.e())/p.e();
       double zg = min(d1.pt(), d2.pt()) / (d1.pt() + d2.pt());
-      //std::cout<<"z1: "<<z1<<" z2: "<<z2<<" p.e(): "<<p.e()<<" dr: "<<dr<<" tf: "<<1./(2.*z1*z2*p.e()*GeVtofm*(1-fastjet::cos_theta(d1,d2)))<<std::endl;
-      //tfesplit.push_back(1./(2.*z1*z2*p.e()*GeVtofm*(1-fastjet::cos_theta(d1,d2))));
       tfesplit.push_back(1./(2.*zg*(1-zg)*p.perp()*GeVtofm*(1-cos(dr/R))));
-      //std::cout << "end of calculation " << std::endl;
- 
       id+=2;
       
     }
-    
+    */
     
     //---------------------------------------------------------------------------
     //   jet clustering
@@ -239,7 +303,12 @@ int main (int argc, char ** argv) {
     for(fastjet::PseudoJet p : sigJets) {
       int ipmin = -1;
       double drmin = 999.;
-      for(int ip = 0; ip<partons.size(); ++ip) {
+      int particlesSize = particlesMergedAll.size();
+      for(int ip = 0; ip< std::min(particlesSize,6); ++ip) {
+        PseudoJet p = particlesMergedAll[ip];
+        int vtx = p.user_info<PU14>().vertex_number();
+        if(vtx != -1) continue;
+        //for(int ip = 0; ip<partons.size(); ++ip) {
         //double dr = p.delta_R(partons[ip]);//I could belive that smth is wrng here ..  
         double dr = std::sqrt(p.squared_distance(partons[ip]));
 	if(dr<drmin) {//though it looks all reasonable, the fact that the partons ipmin is always 0 or 1 is suspicious to me...
@@ -409,7 +478,12 @@ int main (int argc, char ** argv) {
     for(fastjet::PseudoJet p : csFullJets) {
       int ipmin = -1;
       double drmin = 999.;
-      for(int ip = 0; ip<partons.size(); ++ip) {
+      int particlesSize = particlesMergedAll.size();
+      for(int ip = 0; ip< std::min(particlesSize,6); ++ip) {
+        PseudoJet p = particlesMergedAll[ip];
+        int vtx = p.user_info<PU14>().vertex_number();
+        if(vtx != -1) continue;
+      //for(int ip = 0; ip<partons.size(); ++ip) {
         double dr = p.delta_R(partons[ip]);
         if(dr<drmin) {
           drmin = dr;
@@ -491,7 +565,14 @@ int main (int argc, char ** argv) {
     trwSig.addPartonCollection("partonsFirstSplit",       partonsFirstSplit);
     trwSig.addDoubleCollection("drsplit", drsplit);
     trwSig.addDoubleCollection("tfesplit", tfesplit);
-    
+    trwSig.addDoubleCollection("zgsplit", zgsplit);
+    trwSig.addDoubleCollection("ktsplit", ktsplit);
+
+    trwSig.addDoubleCollection("partonWd1Wod2pt", partonWd1Wod2pt);
+    trwSig.addDoubleCollection("partonWod1Wd2pt", partonWod1Wd2pt);
+    trwSig.addDoubleCollection("partonWd1d2pt", partonWd1d2pt);
+    trwSig.addDoubleCollection("partonWod1d2pt", partonWod1d2pt);
+
     trwSig.addCollection("sigJet",        jetCollectionSig);
     trwSig.addCollection("sigJetCh",      jetCollectionSigCh);
 
@@ -504,7 +585,9 @@ int main (int argc, char ** argv) {
   Bar.Print();
   Bar.PrintLine();
 
-  trwSig.getTree()->Write();
+  fout->cd();
+  TTree *trOut = trwSig.getTree();
+  trOut->Write();
   fout->Write();
   fout->Close();
 
