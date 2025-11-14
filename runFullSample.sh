@@ -58,8 +58,31 @@ data=(
 	"20"
 )
 
-for fileNumber in "${data[@]}"; do
-       echo "file number: $fileNumber"
+ptHat=(
+	"20"
+	"30"
+	"40"
+	"50"
+	"60"
+	"70"
+	"80"
+	"90"
+	"110"
+	"135"
+	"165"
+)
+
+#for fileNumber in "${ptHat[@]}"; do
+#       echo "file number: $fileNumber"
+#       ./runTimeClusBkg -hard /dcache/alice/jlomker/PYTHIA/LHC_13p6TeV/PythiaEventsTune14PtHat$fileNumber.pu14 -nev 100000
+#       mv JetToyHIResultTimeClusBkg.root JetToyHIResultTimeClusBkg_13p6_$fileNumber.root
+#       echo "13.6TeV done"
+#done
+for fileNumber in "${ptHat[@]}"; do
+       #echo "file number: $fileNumber"
+       #./runTimeClusBkg -hard /dcache/alice/jlomker/PYTHIA/LHC_5p36TeV/PythiaEventsTune14PtHat$fileNumber.pu14 -nev 100000
+       #mv JetToyHIResultTimeClusBkg.root JetToyHIResultTimeClusBkg_5p36_$fileNumber.root
+       #echo "5.36TeV done"
        ./runTimeClus_data -hard /dcache/alice/jlomker/LHC22o_pass7_minBias/526641/vectorTree_LHC22o_pass7_$fileNumber.root -hardtype ROOT -hardtreename o2Tracks -hardvarname particle_data -nev 50000
        mv JetToyHIResultTimeClus_data.root /dcache/alice/jlomker/LHC22o_pass7_minBias/526641/results/JetToyHIResultTimeClus_data_$fileNumber.root
  #./runTimeClus_MC -hard input/vectorTree_LHC25a2b.root -hardtype ROOT -hardtreename o2TracksFormatted -hardvarname particle_truth -reco input/vectorTree_LHC25a2b.root -hardtype ROOT -hardtreename o2TracksFormatted -hardvarname particle_reco -nev 10000

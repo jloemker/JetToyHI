@@ -1,6 +1,6 @@
 #!/bin/bash
 
-store="/dcache/alice/jlomker/LHC22o_pass7_minBias" # make this your path
+store="/dcache/alice/jlomker/LHC22o_pass7_minBias/346364" # make this your path
 
 mkdir -p $store
 

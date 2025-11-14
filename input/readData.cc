@@ -420,6 +420,7 @@ void readAndWriteMC(TString inputFile, TString outputFile){
 void readData(){
     //read("AO2D.root");
     //readAndWrite("TestAO2D.root", "vectorTree_LHC22o_pass7.root");
-    readAndWrite("/dcache/alice/jlomker/LHC22o_pass7_minBias/AO2D_allRuns.root", "/dcache/alice/jlomker/LHC22o_pass7_minBias/526641/vectorTree_LHC22o_pass7.root");
+    
+   //readAndWrite("/dcache/alice/jlomker/LHC22o_pass7_minBias/346364", "/dcache/alice/jlomker/LHC22o_pass7_minBias/346364/vectorTree_LHC22o_pass7.root");
    //readAndWriteMC("AO2D_LHC25a2b.root", "vectorTree_LHC25a2b.root");
 }

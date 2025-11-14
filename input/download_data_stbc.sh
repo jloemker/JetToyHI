@@ -1,6 +1,6 @@
 #!/bin/bash
 
-store="/dcache/alice/jlomker/LHC22o_pass7_minBias" # make this your path
+store="/dcache/alice/jlomker/LHC22o_pass7_minBias/346364" # make this your path
 
 mkdir -p $store
 
@@ -12,7 +12,7 @@ for i in "${runs[@]}"
 do
   echo "Run [$i]: ${hyperpath["${c}"]}"
   mkdir -p $store/$i/ 
-  ./alien_find_jl.sh "${hyperpath["${c}"]}"/AOD/ AO2D.root > files_per_run.txt
+  ./alien_find_jl.sh "${hyperpath["${c}"]}"/ AO2D.root > files_per_run.txt
   ((c+=1))
   j=0
   while IFS= read -r line
