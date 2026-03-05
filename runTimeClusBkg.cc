@@ -50,6 +50,7 @@ int main (int argc, char ** argv) {
   CmdLine cmdline(argc,argv);
   // inputs read from command line
   int nEvent = cmdline.value<int>("-nev",1);  // first argument: command line option; second argument: default value
+  int bin = cmdline.value<int>("-bin",20)
   //bool verbose = cmdline.present("-verbose");
 
   std::cout << "will run on " << nEvent << " events" << std::endl;
@@ -58,7 +59,7 @@ int main (int argc, char ** argv) {
   ClusterSequence::set_fastjet_banner_stream(NULL);
 
   //to write info to root tree
-  TFile *fout = new TFile("JetToyHIResultTimeClusBkg.root","RECREATE");
+  TFile *fout = new TFile("JetToyHIResultTimeClusBkg"+bin+".root","RECREATE");
   
   treeWriter trwSig("jetTreeSig");
  
@@ -148,7 +149,7 @@ int main (int argc, char ** argv) {
 
     //trwSig.addDoubleCollection("partonWoConst", partonWoConst);// to check for parton pt of those that don't split 
     //for(int ip = 0; ip<std::min(particlesMergedAll.size(),6); ++ip) {
-    std::cout<<"N event: "<<iev<<std::endl;
+    //std::cout<<"N event: "<<iev<<std::endl;
     int particlesSize = particlesMergedAll.size();
     for(int ip = 0; ip< std::min(particlesSize,6); ++ip) {
       bool d1True=false;
@@ -189,13 +190,14 @@ int main (int argc, char ** argv) {
           ktsplit.push_back(kt);
           double zg = min(d1.pt(), d2.pt()) / (d1.pt() + d2.pt());
 	  zgsplit.push_back(zg);
-          tfesplit.push_back(1./(2.*zg*(1-zg)*p.perp()*GeVtofm*(1-cos(dr))));
-
+          tfesplit.push_back(1./(2.*zg*(1-zg)*p.perp()*GeVtofm*(1-cos(dr/R))));//correcting this
         }else{//to make sure that the matching still works out !
-	  drsplit.push_back(-99);
+	 /* drsplit.push_back(-99);
 	  ktsplit.push_back(-99);
 	  zgsplit.push_back(-99);
 	  tfesplit.push_back(-99);
+	*/
+	  std::cout<<"missing daughter(s)";
 	}
         if( (d1True==true) && (d2True==false)){
           partonWd1Wod2pt.push_back(p.pt());
@@ -300,22 +302,50 @@ int main (int argc, char ** argv) {
     std::vector<int> partonmatch;
     std::vector<double> partonmatchdr;
     std::vector<fastjet::PseudoJet> sigJets =  jetCollectionSig.getJet();
-    for(fastjet::PseudoJet p : sigJets) {
+    for(fastjet::PseudoJet j : sigJets) {
       int ipmin = -1;
       double drmin = 999.;
       int particlesSize = particlesMergedAll.size();
       for(int ip = 0; ip< std::min(particlesSize,6); ++ip) {
+        bool d1True=false;
+        bool d2True=false;
+        PseudoJet d1;
+        PseudoJet d2;
         PseudoJet p = particlesMergedAll[ip];
         int vtx = p.user_info<PU14>().vertex_number();
-        if(vtx != -1) continue;
-        //for(int ip = 0; ip<partons.size(); ++ip) {
-        //double dr = p.delta_R(partons[ip]);//I could belive that smth is wrng here ..  
-        double dr = std::sqrt(p.squared_distance(partons[ip]));
-	if(dr<drmin) {//though it looks all reasonable, the fact that the partons ipmin is always 0 or 1 is suspicious to me...
-          drmin = dr;
-          ipmin = ip;
+	if(vtx != -1) continue;
+        if(vtx == -1) {
+          if( (ip+1) < particlesMergedAll.size() ){
+            d1 = particlesMergedAll[ip+1];
+            if(d1.user_info<PU14>().vertex_number()==-2){ // std::cout << "yay daughter 1" << std::endl;
+              d1True=true;
+	    }else{
+              std::cout<<" no 1st daughter for match, but enough entries "<<std::endl;
+            }
+            if( (ip+2) < particlesMergedAll.size() ){
+              d2 = particlesMergedAll[ip+2];
+              if(d2.user_info<PU14>().vertex_number()==-2){ // std::cout << "yay daughter 2" << std::endl;
+                d2True=true;
+              }else{
+                std::cout<<" no 2nd daughter for match, but enough entries "<<std::endl;
+              }
+            }else{
+              std::cout<<"no entries for 2nd daughter match"<<std::endl;
+            }
+          }else{
+            std::cout<<"no entries 1st daughter match"<<std::endl;
+          }
+          if( (d1True==true) && (d2True==true)){
+            double dr = std::sqrt(j.squared_distance(partons[ip]));// distance jet to parton 
+	  //for(int ip = 0; ip<partons.size(); ++ip) {
+          //double dr = p.delta_R(partons[ip]);//I could belive that smth is wrng here ..  
+	    if(dr<drmin) {//though it looks all reasonable, the fact that the partons ipmin is always 0 or 1 is suspicious to me...
+              drmin = dr;
+              ipmin = ip;
+            }
+          }
         }
-      }
+      }// ip loop
       //std::cout<<"drmin: "<<drmin<<"      ipmin: "<<ipmin<<std::endl;
       partonmatch.push_back(ipmin);
       partonmatchdr.push_back(drmin);
@@ -475,24 +505,52 @@ int main (int argc, char ** argv) {
     std::vector<int> partonmatchCSFull;
     std::vector<double> partonmatchdrCSFull;
     std::vector<fastjet::PseudoJet> csFullJets =  jetCollectionCSFull.getJet();
-    for(fastjet::PseudoJet p : csFullJets) {
+    for(fastjet::PseudoJet j : csFullJets) {
       int ipmin = -1;
       double drmin = 999.;
       int particlesSize = particlesMergedAll.size();
       for(int ip = 0; ip< std::min(particlesSize,6); ++ip) {
+        bool d1True=false;
+        bool d2True=false;
+        PseudoJet d1;
+        PseudoJet d2;
         PseudoJet p = particlesMergedAll[ip];
         int vtx = p.user_info<PU14>().vertex_number();
         if(vtx != -1) continue;
-      //for(int ip = 0; ip<partons.size(); ++ip) {
-        double dr = p.delta_R(partons[ip]);
-        if(dr<drmin) {
-          drmin = dr;
-          ipmin = ip;
-        }
+        if(vtx == -1) {
+          if( (ip+1) < particlesMergedAll.size() ){
+            d1 = particlesMergedAll[ip+1];
+            if(d1.user_info<PU14>().vertex_number()==-2){
+              d1True=true;
+	    }else{
+              std::cout<<" no 1st daughter for match csMatch, but enough entries "<<std::endl;
+            }
+            if( (ip+2) < particlesMergedAll.size() ){
+              d2 = particlesMergedAll[ip+2];
+              if(d2.user_info<PU14>().vertex_number()==-2){ 
+                d2True=true;
+              }else{
+                std::cout<<" no 2nd daughter for match csMatch, but enough entries "<<std::endl;
+              }
+            }else{
+              std::cout<<"no entries for 2nd daughter csMatch"<<std::endl;
+            }
+          }else{
+            std::cout<<"no entries 1st daughter csMatch"<<std::endl;
+          }
+          if( (d1True==true) && (d2True==true)){
+            double dr = j.delta_R(partons[ip]);
+            if(dr<drmin) {
+              drmin = dr;
+              ipmin = ip;
+            }
+         }
       }
-      partonmatchCSFull.push_back(ipmin);
-      partonmatchdrCSFull.push_back(drmin);
+    }// ip loop
+    partonmatchCSFull.push_back(ipmin);
+    partonmatchdrCSFull.push_back(drmin);
     }
+
     jetCollectionCSFull.addVector("csFullJetRecur_partonMatchID", partonmatchCSFull);
     jetCollectionCSFull.addVector("csFullJetRecur_partonMatchDr", partonmatchdrCSFull);
 

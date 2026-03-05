@@ -117,9 +117,10 @@ int main (int argc, char ** argv) {
       PseudoJet d2 = partonsFirstSplit[id+1];
       double dr = d1.delta_R(d2);
       drsplit.push_back(dr);
-      double z1 = max(d1.e(),d2.e())/p.e();
-      double z2 = min(d1.e(),d2.e())/p.e();
-      tfsplit.push_back(1./(2.*z1*z2*p.e()*GeVtofm*(1-fastjet::cos_theta(d1,d2))));
+      double z1 = max(d1.perp(),d2.perp())/p.perp();
+      double z2 = min(d1.perp(),d2.perp())/p.perp();
+      double zg = min(d1.pt(), d2.pt()) / (d1.pt() + d2.pt());
+      tfsplit.push_back(1./(2.*zg*(1-zg)*p.perp()*GeVtofm*(1-cos(dr))));
     
       id+=2;
     }
