@@ -50,7 +50,7 @@ int main (int argc, char ** argv) {
   CmdLine cmdline(argc,argv);
   // inputs read from command line
   int nEvent = cmdline.value<int>("-nev",1);  // first argument: command line option; second argument: default value
-  int bin = cmdline.value<int>("-bin",20)
+  // int bin = cmdline.value<int>("-bin",20);
   //bool verbose = cmdline.present("-verbose");
 
   std::cout << "will run on " << nEvent << " events" << std::endl;
@@ -59,7 +59,7 @@ int main (int argc, char ** argv) {
   ClusterSequence::set_fastjet_banner_stream(NULL);
 
   //to write info to root tree
-  TFile *fout = new TFile("JetToyHIResultTimeClusBkg"+bin+".root","RECREATE");
+  TFile *fout = new TFile("JetToyHIResultTimeClusBkg.root","RECREATE");
   
   treeWriter trwSig("jetTreeSig");
  
@@ -192,11 +192,10 @@ int main (int argc, char ** argv) {
 	  zgsplit.push_back(zg);
           tfesplit.push_back(1./(2.*zg*(1-zg)*p.perp()*GeVtofm*(1-cos(dr/R))));//correcting this
         }else{//to make sure that the matching still works out !
-	 /* drsplit.push_back(-99);
+	  drsplit.push_back(-99);
 	  ktsplit.push_back(-99);
 	  zgsplit.push_back(-99);
 	  tfesplit.push_back(-99);
-	*/
 	  std::cout<<"missing daughter(s)";
 	}
         if( (d1True==true) && (d2True==false)){
@@ -336,7 +335,7 @@ int main (int argc, char ** argv) {
             std::cout<<"no entries 1st daughter match"<<std::endl;
           }
           if( (d1True==true) && (d2True==true)){
-            double dr = std::sqrt(j.squared_distance(partons[ip]));// distance jet to parton 
+            double dr = std::sqrt(j.squared_distance(particlesMergedAll[ip]));// distance jet to parton 
 	  //for(int ip = 0; ip<partons.size(); ++ip) {
           //double dr = p.delta_R(partons[ip]);//I could belive that smth is wrng here ..  
 	    if(dr<drmin) {//though it looks all reasonable, the fact that the partons ipmin is always 0 or 1 is suspicious to me...
@@ -539,7 +538,7 @@ int main (int argc, char ** argv) {
             std::cout<<"no entries 1st daughter csMatch"<<std::endl;
           }
           if( (d1True==true) && (d2True==true)){
-            double dr = j.delta_R(partons[ip]);
+            double dr = j.delta_R(particlesMergedAll[ip]);
             if(dr<drmin) {
               drmin = dr;
               ipmin = ip;
