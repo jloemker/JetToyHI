@@ -190,7 +190,7 @@ int main (int argc, char ** argv) {
           ktsplit.push_back(kt);
           double zg = min(d1.pt(), d2.pt()) / (d1.pt() + d2.pt());
 	  zgsplit.push_back(zg);
-          tfesplit.push_back(1./(2.*zg*(1-zg)*p.perp()*GeVtofm*(1-cos(dr/R))));//correcting this
+          tfesplit.push_back(1./(2.*zg*(1-zg)*p.pt()*GeVtofm*(1-cos(dr))));//correcting this
         }else{//to make sure that the matching still works out !
 	  drsplit.push_back(-99);
 	  ktsplit.push_back(-99);
@@ -211,29 +211,6 @@ int main (int argc, char ** argv) {
     }
     //std::cout<<"event "<<iev<<std::endl;
 
-    /*
-    // old version
-    for(int ip = 0; ip<partons.size(); ++ip) {
-      std::cout<<"N event: "<<iev<<std::endl;
-      std::cout << "1st split hard parton "<<" ip: "<<ip<<" partons[ip]: "<<partons[ip]<<"\n";
-      std::cout<<"partonsFirstSplit[id]: "<<partonsFirstSplit[id]<<"\n";
-      std::cout<<"partonsFirstSplit[id+1]: "<<partonsFirstSplit[id+1] << std::endl;
-      PseudoJet p = partons[ip];
-      PseudoJet d1 = partonsFirstSplit[id];
-      PseudoJet d2 = partonsFirstSplit[id+1];
-      double dr = std::sqrt(d1.squared_distance(d2));
-      double kt = min(d1.pt(), d2.pt())*dr; 
-      drsplit.push_back(dr);
-      ktsplit.push_back(kt);
-      double z1 = max(d1.e(),d2.e())/p.e();
-      double z2 = min(d1.e(),d2.e())/p.e();
-      double zg = min(d1.pt(), d2.pt()) / (d1.pt() + d2.pt());
-      tfesplit.push_back(1./(2.*zg*(1-zg)*p.perp()*GeVtofm*(1-cos(dr/R))));
-      id+=2;
-      
-    }
-    */
-    
     //---------------------------------------------------------------------------
     //   jet clustering
     //---------------------------------------------------------------------------
@@ -336,16 +313,13 @@ int main (int argc, char ** argv) {
           }
           if( (d1True==true) && (d2True==true)){
             double dr = std::sqrt(j.squared_distance(particlesMergedAll[ip]));// distance jet to parton 
-	  //for(int ip = 0; ip<partons.size(); ++ip) {
-          //double dr = p.delta_R(partons[ip]);//I could belive that smth is wrng here ..  
-	    if(dr<drmin) {//though it looks all reasonable, the fact that the partons ipmin is always 0 or 1 is suspicious to me...
+	    if(dr<drmin) {
               drmin = dr;
               ipmin = ip;
-            }
+	    }
           }
         }
       }// ip loop
-      //std::cout<<"drmin: "<<drmin<<"      ipmin: "<<ipmin<<std::endl;
       partonmatch.push_back(ipmin);
       partonmatchdr.push_back(drmin);
     }

@@ -309,7 +309,7 @@ void softDropCounter::run()
             beforeFirstSplit = false;
             z.push_back(zg);
             dr.push_back(DeltaR);
-            pt.push_back(CurrentJet.perp());
+            pt.push_back(CurrentJet.pt());
             eta.push_back(CurrentJet.eta());
             erad.push_back(sj1.e()+sj2.e());
             log1dr.push_back(log(1./DeltaR));
@@ -317,8 +317,8 @@ void softDropCounter::run()
             //tf.push_back(2./(zg*(1.-zg)*CurrentJet.perp()*GeVtofm*DeltaR*DeltaR/r0_/r0_));//original
             //tf.push_back(2./(zg*CurrentJet.perp()*GeVtofm*(DeltaR/r0_)*(DeltaR/r0_)));//Johanna soft collinear limit of the tfe (z*E ~ omega, (1-z) ~ 1) cos(theta_12) ~ 1- theta^{2}/2
             //tfe.push_back(1./(2.*z1*z2*CurrentJet.e()*GeVtofm*(1-fastjet::cos_theta(sj1,sj2))));//original
-            tf.push_back(1./(2.*zg*(1-zg)*CurrentJet.perp()*GeVtofm*(1-cos(DeltaR/r0_))));//Johanna
-            tfe.push_back(hbarc*(sj1.perp() + sj2.perp())/( sj1.perp()*sj2.perp() * DeltaR * DeltaR));//Morgan
+            tf.push_back(1./(2.*zg*(1-zg)*CurrentJet.pt()*GeVtofm*(1-cos(DeltaR))));//Johanna
+            tfe.push_back(hbarc*(sj1.pt() + sj2.pt())/( sj1.pt()*sj2.pt() * DeltaR * DeltaR));//Morgan
             kt.push_back(min(PT1,PT2)*DeltaR);
             
 	    if(thirdSplit == true){
