@@ -121,9 +121,7 @@ int main (int argc, char ** argv) {
     fastjet::Selector bkg_selector = SelectorVertexNumber(1);
     vector<PseudoJet> particlesBkg = bkg_selector(particlesMergedAll);
 
-    //vector<PseudoJet> particlesMerged = particlesBkg;//Marta
     vector<PseudoJet> particlesMerged = particlesSig;//Bas
-    //particlesMerged.insert( particlesMerged.end(), particlesSig.begin(), particlesSig.end() );//Marta
     particlesMerged.insert( particlesMerged.end(), particlesPileup.begin(), particlesPileup.end() );
     //charged particles
     fastjet::Selector charged_selector = SelectorIsCharged();
@@ -147,9 +145,6 @@ int main (int argc, char ** argv) {
     double GeVtofm = 1./hbarc; //~5.068;
     int id = 0;
 
-    //trwSig.addDoubleCollection("partonWoConst", partonWoConst);// to check for parton pt of those that don't split 
-    //for(int ip = 0; ip<std::min(particlesMergedAll.size(),6); ++ip) {
-    //std::cout<<"N event: "<<iev<<std::endl;
     int particlesSize = particlesMergedAll.size();
     for(int ip = 0; ip< std::min(particlesSize,6); ++ip) {
       bool d1True=false;
@@ -246,8 +241,8 @@ int main (int argc, char ** argv) {
     jetCollectionSig.addVector("sigJetRecur_logztheta", sdcSig.getLogzDRs());
     jetCollectionSig.addVector("sigJetRecur_nSD",       sdcSig.calculateNSD(0.0));
     jetCollectionSig.addVector("sigJetRecur_zSD",       sdcSig.calculateNSD(1.0));
-    jetCollectionSig.addVector("sigJetRecur_tf",        sdcSig.getTfs());//high E & soft & collinear
-    jetCollectionSig.addVector("sigJetRecur_tfe",       sdcSig.getTfes());//high E (1-cos)
+    jetCollectionSig.addVector("sigJetRecur_tf",        sdcSig.getTfs());//johanna cos()
+    jetCollectionSig.addVector("sigJetRecur_tfe",       sdcSig.getTfes());//morgan (pt's)
     jetCollectionSig.addVector("sigJetRecur_tfe2",      sdcSig.getTfes2());//1->3 split
 
     jetCollectionSig.addVector("sigJetRecurTau_jetpt",     sdcTau.getPts());

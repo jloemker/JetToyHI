@@ -1,6 +1,7 @@
 #!/bin/bash
 
 ptHat=(
+	"200"
 	"20"
 	"30"
 	"40"
@@ -16,8 +17,9 @@ ptHat=(
 
 for pthat in "${ptHat[@]}"; do
        echo "file number: $pthat"
-       ./runCreatePythiaEvents -pthat $pthat -nev 100000
-       mv PythiaEventsTune14PtHat$pthat.pu14 /dcache/alice/jlomker/PYTHIA/LHC_5p36TeV/PythiaEventsTune14PtHat$pthat.pu14
+       ./runCreatePythiaEvents -pthat $pthat -nev 1000000 > stats$pthat.txt
+       mv PythiaEventsTune14PtHat$pthat.pu14 /dcache/alice/jlomker/PYTHIA/LHC_13p6TeV/PythiaEventsTune14PtHat$pthat.pu14
+       mv stats$pthat.txt /dcache/alice/jlomker/PYTHIA/LHC_13p6TeV/
 done
 
 echo "all done!"

@@ -1,0 +1,15 @@
+universe   = vanilla
+
+executable = submitJEWEL.sh
+arguments  = $(PT) $(JOB)
+
+request_cpus   = 4
+request_memory = 16G
+
+log        = test.log
+output     = test.out
+error      = test.error
++JobCategory = "medium"
++UseOS = "el9"
+
+queue PT,JOB from external.dat

@@ -51,8 +51,15 @@ pythiaEvent::pythiaEvent(double pthat, unsigned int tune, double rapMin, double 
     
   // Generator. LHC process and output selection. Initialization.
   // tunes: http://home.thep.lu.se/~torbjorn/pythia82html/Tunes.html
-  pythia.readString("Beams:eCM = 5360.");//should be 5.36 for run3 ?
-  //pythia.readString("Beams:eCM = 13600.");
+  //pythia.readString("Beams:eCM = 5360.");//should be 5.36 for run3 ?
+  const int PYTHIA_SEED_MAX = 900000000;
+  long time_in_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+  long seed = getpid() + time_in_ms;
+  seed %= PYTHIA_SEED_MAX;
+  seed++;
+  //std::cout<<"seed: "<<seed<<std::endl;
+
+  pythia.readString("Beams:eCM = 13600.");
   if(process_==0)      pythia.readString("HardQCD:all = on");
   else if(process_==1) pythia.readString("PromptPhoton:all = on");
   pythia.readString(Form("PhaseSpace:pTHatMin = %.1f",pthat_));
@@ -60,7 +67,11 @@ pythiaEvent::pythiaEvent(double pthat, unsigned int tune, double rapMin, double 
   pythia.readString("Next:numberShowProcess = 0");
   pythia.readString("Next:numberShowEvent = 0");
   pythia.readString("Random:setSeed = on");
-  pythia.readString("Random:seed = 0");
+  //pythia.readString(Form("Random:seed = %ld",seed));
+  pythia.readString(Form("Random:seed = %ld",seed));
+  // get parton vertices:
+  pythia.readString("PartonVertex:setVertex = on");
+  pythia.readString("PartonVertex:modeVertex = 2");
   if(partonLevel_) {
     pythia.readString("HadronLevel:all = off");
   }
@@ -92,9 +103,44 @@ std::vector<fastjet::PseudoJet> pythiaEvent::createPythiaEvent() {
     if (pythia.event[i].isFinal()) { //all final state particles
       fastjet::PseudoJet p(pythia.event[i].px(),pythia.event[i].py(),pythia.event[i].pz(),pythia.event[i].e());
       p.set_user_info(new extraInfo(pythia.event[i].id(), 0)); 
+      //space-time info
+      double x = pythia.event[i].xProd();
+      double y = pythia.event[i].yProd();
+      double z = pythia.event[i].zProd();
+      double t = pythia.event[i].tProd();
+      //if(t > 0.0) std::cout<<"New isFinal - x: "<<x<<", y: "<<y<<", z: "<<z<<", t: "<<t<<std::endl;
+      //try to find mother:
+      int m1 = pythia.event[i].mother1();
+      int m2 = pythia.event[i].mother2();
+ 
+      double tm1 = pythia.event[m1].tProd();
+      double tm2 = pythia.event[m2].tProd();
+      //if(tm1 > 0.0) std::cout<<"mother1: "<<tm1<<", mother2: "<<tm2<<std::endl;
+      int m11, m12;
+      if(tm1 > tm2){
+	//std::cout<<">>>>Follow mother1"<<std::endl;
+        m11 = pythia.event[m1].mother1();
+        m12 = pythia.event[m1].mother2();
+      }else{
+	//std::cout<<">>>>Follow mother2"<<std::endl;
+        m11 = pythia.event[m2].mother1();
+        m12 = pythia.event[m2].mother2();
+      }
+      double tm11 = pythia.event[m11].tProd();
+      double tm12 = pythia.event[m12].tProd();
+      //std::cout<<"mother11: "<<tm11<<", mother12: "<<tm12<<std::endl;
+      
+
       if(p.rap()>rapMin_ && p.rap()<rapMax_)
         particles.push_back(p);
     } else if (pythia.event[i].status()==-23) { //outgoing partons from the hard scattering
+      //space-time info
+      double x = pythia.event[i].xProd();
+      double y = pythia.event[i].yProd();
+      double z = pythia.event[i].zProd();
+      double t = pythia.event[i].tProd();
+      //if(t > 0) std::cout<<"isOutgoing - x: "<<x<<", y: "<<y<<", z: "<<z<<", t: "<<t<<std::endl;
+
       fastjet::PseudoJet p(pythia.event[i].px(),pythia.event[i].py(),pythia.event[i].pz(),pythia.event[i].e());
       p.set_user_info(new extraInfo(pythia.event[i].id(), -1)); 
       partons.push_back(p);
@@ -104,6 +150,18 @@ std::vector<fastjet::PseudoJet> pythiaEvent::createPythiaEvent() {
       while(d1==d2 && d1>0) {
         d1 = pythia.event[d1].daughter1();
         d2 = pythia.event[d2].daughter2();
+
+	x = pythia.event[d1].xProd();
+        y = pythia.event[d1].yProd();
+        z = pythia.event[d1].zProd();
+        t = pythia.event[d1].tProd();
+        //if(t != 0) std::cout<<"d1 - x: "<<x<<", y: "<<y<<", z: "<<z<<", t: "<<t<<std::endl;
+        x = pythia.event[d2].xProd();
+        y = pythia.event[d2].yProd();
+        z = pythia.event[d2].zProd();
+        t = pythia.event[d2].tProd();
+        //if(t != 0) std::cout<<"d2 - x: "<<x<<", y: "<<y<<", z: "<<z<<", t: "<<t<<std::endl;
+ 
       }
 
       if(vinciaShower_) { //in vincia need to pass the recoil type of particles
@@ -145,12 +203,31 @@ std::vector<fastjet::PseudoJet> pythiaEvent::createPythiaEvent() {
 	fastjet::PseudoJet pd1(pythia.event[d1].px(),pythia.event[d1].py(),pythia.event[d1].pz(),pythia.event[d1].e());
 	pd1.set_user_info(new extraInfo(pythia.event[d1].id(), -2)); 
 	partons.push_back(pd1);
+        double x = pythia.event[d1].xProd();
+        double y = pythia.event[d1].yProd();
+        double z = pythia.event[d1].zProd();
+        double t = pythia.event[d1].tProd();
+        //if(t != 0) std::cout<<"isDaughter1 - x: "<<x<<", y: "<<y<<", z: "<<z<<", t: "<<t<<std::endl;
+
       }
       if(d2>0) {
 	fastjet::PseudoJet pd2(pythia.event[d2].px(),pythia.event[d2].py(),pythia.event[d2].pz(),pythia.event[d2].e());
 	pd2.set_user_info(new extraInfo(pythia.event[d2].id(), -2)); 
 	partons.push_back(pd2);
+        double x = pythia.event[d2].xProd();
+        double y = pythia.event[d2].yProd();
+        double z = pythia.event[d2].zProd();
+        double t = pythia.event[d2].tProd();
+        //if(t > 0) std::cout<<"isDaughter2 - x: "<<x<<", y: "<<y<<", z: "<<z<<", t: "<<t<<std::endl;
       }
+    }
+     else if(pythia.event[i].isParton()){
+      double x = pythia.event[i].xProd();
+      double y = pythia.event[i].yProd();
+      double z = pythia.event[i].zProd();
+      double t = pythia.event[i].tProd();
+     // if(t != 0) std::cout<<"isParton - x: "<<x<<", y: "<<y<<", z: "<<z<<", t: "<<t<<std::endl;
+
     }
   }
   nev += 1;

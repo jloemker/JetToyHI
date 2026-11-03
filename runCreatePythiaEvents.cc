@@ -50,8 +50,8 @@ int main (int argc, char ** argv)
   
   unsigned int entryDiv = (nEvent > 200) ? nEvent / 200 : 1;
   for(unsigned int ie = 0; ie < nEvent; ie++) {
-    Bar.Update(ie);
-    Bar.PrintWithMod(entryDiv);
+   // Bar.Update(ie);
+   // Bar.PrintWithMod(entryDiv);
     
     //---------------------------------------------------------------------------
     //   produce event
@@ -60,7 +60,19 @@ int main (int argc, char ** argv)
     fout << "# event " << ie << "\n";
     std::vector<fastjet::PseudoJet> particlesSig = pyt.createPythiaEvent();
     fout << "weight " << pyt.getWeight() <<  " pthat " << pyt.getPtHat() << "\n"; //<< " weight " << pow(15./pyt.getPtHat(),4.5)
+    //std::cout<<pyt.xProd()::std::endl;
+    // testing space-time info:
+    //for (int i = 0; i< particlesSig.size(); i++){
+      //if(particlesSig[ie].isFinal()){
+      //  double x = particlesSig[i].xProd();
+      //  double y = particlesSig[i].yProd();
+      //  double z = particlesSig[i].zProd();
+      //  double t = particlesSig[i].tProd();
+      //  std::cout<<"x: "<<x<<", y: "<<y<<", z: "<<z<<", t: "<<t<<std::endl;
+    //  }
+    //}
 
+ 
     std::vector<fastjet::PseudoJet> partons = pyt.getPartonList();
     for(fastjet::PseudoJet p : partons) {
       const int & pdgid = p.user_info<extraInfo>().pdg_id();
@@ -80,8 +92,6 @@ int main (int argc, char ** argv)
   }
 
   pyt.getStat();
- 
-
   fout.close();
 
   std::cout << "\n Finished generating PYTHIA events" << std::endl;
