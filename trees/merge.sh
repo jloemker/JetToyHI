@@ -15,9 +15,10 @@ done
 echo "created merge lists"
 
 for PT in {20,30,40,50,60,70,80,90,110,135,165,200}
+#for PT in {135,165,200}
 do
 	echo "testing"
-	#hadd -k -f /dcache/alice/jlomker/Jewel/vac/analysisResults/JetToyHIResultTimeClusJewel_${PT}.root mergeLists/@hadd_${PT}_this.list
+	hadd -k -f /dcache/alice/jlomker/Jewel/vac/analysisResults/JetToyHIResultTimeClusJewel_${PT}.root @mergeList/hadd_${PT}_this.list
 done
 
 echo "done merging things"

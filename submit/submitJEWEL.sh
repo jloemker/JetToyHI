@@ -9,9 +9,12 @@ cp /data/alice/jlomker/jetToyHI/JetToyHI/runTimeClusJewel .
 
 echo "pTbin: $1"
 echo "file Number: $2"
-./runTimeClusJewel -hard /dcache/alice/jlomker/Jewel/vac/2.2.0_$1_$2.hepmc -hardtype HepMC2 -nev 100000
-mv JetToyHIResultTimeClusJewel.root /dcache/alice/jlomker/Jewel/vac/analysisResults/JetToyHIResultTimeClusJewel_$1_$2.root
+#./runTimeClusJewel -hard /dcache/alice/jlomker/Jewel/vac/2.2.0_$1_$2.hepmc -hardtype HepMC2 -nev 100000
+./runTimeClusJewel -hard /dcache/alice/jlomker/Jewel/med/2.2.0_$1_$2.hepmc -hardtype HepMC2 -nev 100000
+mv JetToyHIResultTimeClusJewel.root /dcache/alice/jlomker/Jewel/med/analysisResults/JetToyHIResultTimeClusJewel_$1_$2.root
 
 echo "done with pt: $1 and file Number: $2"
 
-#echo "all done!"
+cd ../
+rm -rf $1_$2
+echo "all done!"
